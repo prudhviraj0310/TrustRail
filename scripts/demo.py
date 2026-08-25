@@ -13,10 +13,11 @@ then, in another terminal:
     python scripts/demo.py                 # defaults to http://127.0.0.1:8000
     python scripts/demo.py http://host:8000
 
-It demonstrates: (1) the ALLOW happy path to COMPLETED, (2) an over-budget BLOCK,
-(3) transaction-identity determinism (same purchase -> same transaction),
-(4) the paid-but-unfulfilled REFUND_REQUIRED recovery path, and
-(5) the Phase 2 asynchronous payment boundary (PENDING -> webhook -> CONFIRMED).
+It demonstrates: (1) AI-readable merchant discovery, (2) the ALLOW happy path to
+COMPLETED, (3) an over-budget BLOCK, (4) transaction-identity determinism (same
+purchase -> same transaction), (5) the paid-but-unfulfilled REFUND_REQUIRED
+recovery path, and (6) the Phase 2 asynchronous payment boundary
+(PENDING -> webhook -> CONFIRMED).
 
 Section 5 adapts to the server's configured gateway:
 
@@ -88,6 +89,9 @@ def main() -> None:
     with httpx.Client(base_url=BASE_URL, timeout=10.0) as c:
         section("0. Health")
         show("GET", "/health", c.get("/health"))
+
+        section("0b. AI BUYER DISCOVERY — machine-readable merchant card")
+        show("GET", "/merchant/agent-card", c.get("/merchant/agent-card"))
 
         # ------------------------------------------------------------------ #
         section("1. HAPPY PATH — ₹1,299 mouse under a ₹5,000 budget -> COMPLETED")

@@ -9,6 +9,29 @@ from __future__ import annotations
 from app.merchant.catalogue import CATALOGUE
 
 
+def test_root_links_to_agent_card(client):
+    response = client.get("/")
+
+    assert response.status_code == 200
+    assert response.json()["agent_card"] == "/merchant/agent-card"
+
+
+def test_agent_card_exposes_machine_readable_purchase_contract(client):
+    response = client.get("/merchant/agent-card")
+
+    assert response.status_code == 200
+    card = response.json()
+    assert card["schema_version"] == "trustrail-agent-commerce/v1"
+    assert card["merchant_id"] == "MERCH_DEMO_001"
+    assert card["money_unit"] == "minor"
+    assert card["catalogue_endpoint"] == "/merchant/products"
+    assert card["purchase_intent_endpoint"] == "/intents"
+    assert card["transaction_execution_endpoint"] == "/transactions"
+    assert "constraints.max_amount" in card["required_purchase_intent_fields"]
+    assert "confirms payment only from gateway evidence" in card["trustrail_controls"]
+    assert len(card["products"]) == len(CATALOGUE)
+
+
 def test_list_products_returns_full_catalogue(client):
     r = client.get("/merchant/products")
     assert r.status_code == 200

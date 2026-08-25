@@ -13,8 +13,10 @@ from sqlalchemy.orm import Session
 from app.db import get_db
 from app.errors import InsufficientInventory, MerchantOrderFailed, ProductNotFound
 from app.merchant import service
+from app.merchant.catalogue import MERCHANT_ID
 from app.models.merchant import MerchantOrder, MerchantProduct
 from app.schemas.merchant import (
+    AgentCommerceManifestOut,
     CheckoutValidateIn,
     CheckoutValidateOut,
     InventoryOut,
@@ -46,6 +48,53 @@ def _order_out(o: MerchantOrder) -> OrderOut:
         total=o.total,
         currency=o.currency,
         created_at=o.created_at,
+    )
+
+
+@router.get("/agent-card", response_model=AgentCommerceManifestOut)
+def agent_card(db: Session = Depends(get_db)) -> AgentCommerceManifestOut:
+    """Expose a machine-readable catalogue and bounded purchase workflow.
+
+    The card is read-only: it helps an AI buyer discover what the merchant sells
+    and how to make a structured proposal. TrustRail still owns policy, state,
+    payment confirmation, and the audit trail.
+    """
+    return AgentCommerceManifestOut(
+        schema_version="trustrail-agent-commerce/v1",
+        merchant_id=MERCHANT_ID,
+        merchant_name="TrustRail Demo Merchant",
+        currency="INR",
+        money_unit="minor",
+        catalogue_endpoint="/merchant/products",
+        checkout_validation_endpoint="/merchant/checkout/validate",
+        purchase_intent_endpoint="/intents",
+        transaction_execution_endpoint="/transactions",
+        transaction_lookup_endpoint_template="/transactions/{transaction_id}",
+        audit_endpoint_template="/transactions/{transaction_id}/audit",
+        required_purchase_intent_fields=[
+            "agent_id",
+            "merchant_id",
+            "items[].sku",
+            "items[].quantity",
+            "constraints.max_amount",
+            "constraints.currency",
+            "constraints.max_quantity",
+            "authorization.expires_at",
+        ],
+        agent_can=[
+            "discover products and inventory",
+            "request a checkout quote",
+            "propose a structured PurchaseIntent",
+            "read the resulting transaction and audit trail",
+        ],
+        trustrail_controls=[
+            "canonicalizes financially relevant intent fields",
+            "evaluates deterministic merchant and authorization policy",
+            "enforces legal transaction state transitions",
+            "confirms payment only from gateway evidence",
+            "records an append-only audit trail",
+        ],
+        products=[_product_out(product) for product in service.list_products(db)],
     )
 
 

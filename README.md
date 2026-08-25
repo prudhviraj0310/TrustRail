@@ -36,6 +36,7 @@ and explicit state machine do everything that touches money.
 7. [Design decisions](#7-design-decisions)
 8. [Known weaknesses](#8-known-weaknesses)
 9. [Phase 2 — Razorpay Test Mode](#9-phase-2--razorpay-test-mode)
+10. [Track 01 submission story](#10-track-01-submission-story)
 
 ---
 
@@ -327,7 +328,8 @@ timestamp, actor, result, reason, and metadata, ordered by a monotonic `seq`.
 ### Merchant mock API (separate system)
 
 ```
-GET  /merchant/products             GET  /merchant/products/{sku}
+GET  /merchant/agent-card           GET  /merchant/products
+GET  /merchant/products/{sku}
 GET  /merchant/inventory/{sku}      POST /merchant/checkout/validate
 POST /merchant/orders               GET  /merchant/orders/{order_id}
 POST /merchant/orders/{order_id}/cancel
@@ -337,6 +339,20 @@ The catalogue includes deliberately-crafted SKUs to make failure/recovery
 demonstrable: `SKU-OOS` (out of stock), `SKU-USD` (currency mismatch),
 `SKU-FAIL-PAY` (gateway declines), `SKU-FAIL-ORDER` (fulfilment fails after payment).
 
+### `GET /merchant/agent-card` — AI buyer discovery
+
+The merchant exposes a deterministic, versioned discovery document at
+`/merchant/agent-card`. It includes the live synthetic catalogue, price/inventory
+facts, checkout and intent endpoints, the required `PurchaseIntent` fields, and
+the controls TrustRail owns. It is **not** a claim of ACP, AP2, x402, or UAP
+compatibility; it is the small agent-readable contract used by this demo.
+The root metadata endpoint (`GET /`) links to the card for first-request discovery.
+
+An AI buyer can discover products and propose a bounded structured intent. It
+cannot directly set state, declare payment success, bypass policy, or access
+Razorpay credentials. That clean split is what makes the merchant safely
+transactable by an AI buyer end to end.
+
 ---
 
 ## 6. Tests
@@ -345,7 +361,7 @@ demonstrable: `SKU-OOS` (out of stock), `SKU-USD` (currency mismatch),
 .venv/bin/python -m pytest
 ```
 
-**124 tests pass, fully offline.** The suite is hermetic — an in-memory SQLite DB
+**126 tests pass, fully offline.** The suite is hermetic — an in-memory SQLite DB
 and a frozen clock per test, with FastAPI dependency overrides — so it is fully
 deterministic. The Razorpay path is exercised through an **injected fake client**
 and a stdlib reproduction of Razorpay's HMAC signing, so no network or credentials
@@ -515,7 +531,7 @@ whether a payment succeeded.
 
 ### Enabling Razorpay Test Mode
 
-The default is `mock` — everything above runs and all 124 tests pass without any
+The default is `mock` — everything above runs and all 126 tests pass without any
 Razorpay account. To run against real Razorpay **Test Mode** keys (`rzp_test_…`):
 
 ```bash
@@ -540,3 +556,38 @@ Verify the real integration end-to-end with the network-gated contract suite (se
 > **Not production-ready.** This is a buildathon demonstrator. It does not schedule
 > reconciliation, does not provide exactly-once semantics, and its locking is a no-op
 > on SQLite (see §8).
+
+---
+
+## 10. Track 01 submission story
+
+**Track:** AI Growth & Agentic Commerce — “make a merchant transactable by an AI
+buyer end to end.”
+
+TrustRail takes Track 01's transactable-merchant path. The judge-visible story is:
+
+```text
+GET /merchant/agent-card
+    -> discover a machine-readable catalogue and bounded purchase contract
+POST /intents
+    -> AI buyer proposes a structured, user-bounded PurchaseIntent
+POST /intents/{id}/validate -> POST /intents/{id}/authorize -> POST /transactions
+    -> deterministic policy, legal state transitions, and payment orchestration
+PAYMENT_PENDING
+    -> signed Razorpay webhook OR authoritative reconciliation
+PAYMENT_CONFIRMED -> merchant order -> COMPLETED
+```
+
+The differentiator is the failure boundary:
+
+```text
+ambiguous gateway failure -> PAYMENT_UNKNOWN -> DO NOT CHARGE AGAIN
+    -> authoritative reconciliation -> confirmed / failed / recovery
+```
+
+For a live judge run: start the service, open `/docs`, run
+`python scripts/demo.py`, and inspect `GET /transactions/{transaction_id}/audit`.
+The demo shows discovery, an allowed purchase, a policy block, identity
+idempotency, a paid-but-unfulfilled recovery, and the async Razorpay boundary.
+TrustRail is not a generic shopping chatbot, an ACP/AP2/UAP implementation, or a
+production-ready payment processor.

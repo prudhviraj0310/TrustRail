@@ -114,6 +114,7 @@ def root() -> dict:
         "tagline": "Agentic Transaction Integrity & Recovery Engine",
         "docs": "/docs",
         "health": "/health",
+        "agent_card": "/merchant/agent-card",
     }
 
 
