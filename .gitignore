@@ -1,0 +1,27 @@
+# TrustRail — local dev/test artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# Local SQLite databases
+*.db
+trustrail.db
+
+# Environment
+.env
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Local agent tooling (machine-local overrides; not part of the submission)
+.claude/settings.local.json

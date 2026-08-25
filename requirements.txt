@@ -1,0 +1,25 @@
+# TrustRail — Phase 1 runtime dependencies (pinned to tested versions).
+# Python >= 3.11 required.
+
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.52.4
+pydantic==2.13.4
+pydantic-settings==2.15.0
+SQLAlchemy==2.0.52
+python-dotenv==1.2.3
+httpx==0.28.1
+
+# --- PostgreSQL (production source of truth). SQLite needs nothing extra. ---
+psycopg[binary]==3.2.3
+
+# --- Schema migrations for production (dev/test use create_all()). ---
+alembic==1.14.0
+
+# --- Phase 2: Razorpay Test Mode gateway. Only imported when
+#     PAYMENT_GATEWAY=razorpay; the mock path never touches it, so the normal
+#     offline test suite does not require network access or credentials. ---
+razorpay==2.0.1
+
+# --- Test suite ---
+pytest==9.1.1
