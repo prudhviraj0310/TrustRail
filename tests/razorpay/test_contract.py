@@ -67,7 +67,10 @@ def db_session():
     from app.db import Base
 
     engine = create_engine(
-        "sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool, future=True
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+        future=True,
     )
     Base.metadata.create_all(engine)
     Session = sessionmaker(bind=engine, expire_on_commit=False)
@@ -131,9 +134,11 @@ def test_webhook_signature_matches_sdk_utility(gateway):
 
     body = b'{"event":"payment.captured","contract":true}'
     client = razorpay.Client(auth=("x", "y"))
-    sdk_sig = __import__("hmac").new(
-        webhook_secret.encode(), body, __import__("hashlib").sha256
-    ).hexdigest()
+    sdk_sig = (
+        __import__("hmac")
+        .new(webhook_secret.encode(), body, __import__("hashlib").sha256)
+        .hexdigest()
+    )
 
     # our implementation accepts a signature the SDK would also accept
     assert gateway.verify_webhook_signature(body, sdk_sig) is True

@@ -91,8 +91,12 @@ def test_checkout_validate_flags_unknown_sku(client):
 def test_checkout_validate_flags_currency_conflict(client):
     r = client.post(
         "/merchant/checkout/validate",
-        json={"items": [{"sku": "SKU-001", "quantity": 1},
-                        {"sku": "SKU-USD", "quantity": 1}]},
+        json={
+            "items": [
+                {"sku": "SKU-001", "quantity": 1},
+                {"sku": "SKU-USD", "quantity": 1},
+            ]
+        },
     )
     body = r.json()
     assert body["currency_conflict"] is True

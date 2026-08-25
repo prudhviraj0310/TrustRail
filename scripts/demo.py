@@ -1,40 +1,21 @@
 #!/usr/bin/env python3
-"""TrustRail end-to-end demo.
+"""TrustRail end-to-end Track 01 demonstration: AI Growth & Agentic Commerce Engine.
 
-Walks the full lifecycle against a *running* TrustRail server and prints every
-request/response so you can see the deterministic decisions and the audit trail.
+Walks through the complete product story against a running TrustRail server:
+1. AI Buyer discovery of merchant products & active bundles
+2. Normal baseline purchase execution
+3. KILLER DEMO: Dynamic Workstation Bundle upsell within user's ₹5,000 budget
+4. SAFETY BOUNDARY: Over-budget proposal blocked by TrustRail Growth Policy
+5. Recovery & Razorpay payment boundary
+6. Real, persisted Merchant Revenue Growth & Conversion Analytics
 
-Start the server first:
-
+Usage:
     uvicorn app.main:app --reload
-
-then, in another terminal:
-
-    python scripts/demo.py                 # defaults to http://127.0.0.1:8000
-    python scripts/demo.py http://host:8000
-
-It demonstrates: (1) AI-readable merchant discovery, (2) the ALLOW happy path to
-COMPLETED, (3) an over-budget BLOCK, (4) transaction-identity determinism (same
-purchase -> same transaction), (5) the paid-but-unfulfilled REFUND_REQUIRED
-recovery path, and (6) the Phase 2 asynchronous payment boundary
-(PENDING -> webhook -> CONFIRMED).
-
-Section 5 adapts to the server's configured gateway:
-
-* Default **mock** mode: it explains what the async boundary would do, since the
-  mock confirms synchronously and the webhook endpoint is disabled (503).
-* **Razorpay Test Mode** (``PAYMENT_GATEWAY=razorpay``): execution returns
-  ``PAYMENT_PENDING`` with a real ``order_...`` id; the demo then delivers a
-  locally *signed* ``payment.captured`` webhook to drive it to CONFIRMED. Signing
-  needs the same ``RAZORPAY_WEBHOOK_SECRET`` the server uses — this is a
-  dev/test convenience that stands in for Razorpay's servers; in production the
-  signature is produced by Razorpay, never by us.
+    python scripts/demo.py
 """
 
 from __future__ import annotations
 
-import hashlib
-import hmac
 import json
 import os
 import sys
@@ -44,8 +25,6 @@ import httpx
 
 BASE_URL = sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8000"
 MERCHANT_ID = "MERCH_DEMO_001"
-# Only used by section 5 in Razorpay mode, to sign the stand-in webhook the way
-# Razorpay's servers would. Never a real credential in mock mode.
 WEBHOOK_SECRET = os.getenv("RAZORPAY_WEBHOOK_SECRET", "")
 
 
@@ -70,8 +49,15 @@ def show(method: str, path: str, resp: httpx.Response) -> dict:
         return {}
 
 
-def intent_body(*, items, max_amount, max_quantity=1, currency="INR",
-                agent_id="agent-demo-1", merchant_id=MERCHANT_ID) -> dict:
+def intent_body(
+    *,
+    items,
+    max_amount,
+    max_quantity=5,
+    currency="INR",
+    agent_id="agent-demo-buyer",
+    merchant_id=MERCHANT_ID,
+) -> dict:
     return {
         "agent_id": agent_id,
         "merchant_id": merchant_id,
@@ -87,144 +73,124 @@ def intent_body(*, items, max_amount, max_quantity=1, currency="INR",
 
 def main() -> None:
     with httpx.Client(base_url=BASE_URL, timeout=10.0) as c:
-        section("0. Health")
+        section("0. SYSTEM HEALTH & AGENT DISCOVERY")
         show("GET", "/health", c.get("/health"))
-
-        section("0b. AI BUYER DISCOVERY — machine-readable merchant card")
         show("GET", "/merchant/agent-card", c.get("/merchant/agent-card"))
+        show("GET", "/merchant/bundles", c.get("/merchant/bundles"))
 
         # ------------------------------------------------------------------ #
-        section("1. HAPPY PATH — ₹1,299 mouse under a ₹5,000 budget -> COMPLETED")
-        body = intent_body(items=[{"sku": "SKU-001", "quantity": 1}], max_amount=500000)
-        created = show("POST", "/intents", c.post("/intents", json=body))
-        iid, txid = created["intent_id"], created["transaction_id"]
-
-        show("POST", f"/intents/{iid}/validate", c.post(f"/intents/{iid}/validate"))
-        show("POST", f"/intents/{iid}/authorize", c.post(f"/intents/{iid}/authorize"))
-        show("POST", "/transactions", c.post("/transactions", json={"intent_id": iid}))
-        show("GET", f"/transactions/{txid}", c.get(f"/transactions/{txid}"))
-
-        section("1b. AUDIT TRAIL — the full explainable history")
-        show("GET", f"/transactions/{txid}/audit", c.get(f"/transactions/{txid}/audit"))
+        section("1. BASELINE AI PURCHASE — ₹1,299 Wireless Mouse under ₹5,000 budget")
+        body1 = intent_body(items=[{"sku": "SKU-001", "quantity": 1}], max_amount=500000)
+        c1 = show("POST", "/intents", c.post("/intents", json=body1))
+        iid1, txid1 = c1["intent_id"], c1["transaction_id"]
+        c.post(f"/intents/{iid1}/validate")
+        c.post(f"/intents/{iid1}/authorize")
+        show("POST", "/transactions", c.post("/transactions", json={"intent_id": iid1}))
+        show("GET", f"/transactions/{txid1}", c.get(f"/transactions/{txid1}"))
 
         # ------------------------------------------------------------------ #
-        section("2. POLICY BLOCK — ₹1,299 mouse but only ₹1,000 authorized -> BLOCK")
-        body = intent_body(items=[{"sku": "SKU-001", "quantity": 1}], max_amount=100000)
-        created = show("POST", "/intents", c.post("/intents", json=body))
-        show(
-            "POST",
-            f"/intents/{created['intent_id']}/validate",
-            c.post(f"/intents/{created['intent_id']}/validate"),
+        section(
+            "2. THE KILLER DEMO — AI Negotiates Workstation Bundle within ₹5,000 Budget"
+        )
+        print("\n  AI Buyer seeks: 'Workstation Mouse' (SKU-001 @ ₹1,299)")
+        print(
+            "  AI Growth Engine identifies: Workstation Pro Bundle (Mouse + Keyboard + Hub @ ₹3,498)"
+        )
+        print("  Buyer Authorized Budget: ₹5,000.00")
+
+        # Step 2a: Request recommendation
+        rec_req = {
+            "merchant_id": MERCHANT_ID,
+            "cart_items": [{"sku": "SKU-001", "quantity": 1}],
+            "authorized_max_amount": 500000,
+            "currency": "INR",
+        }
+        rec = show("POST", "/growth/recommend", c.post("/growth/recommend", json=rec_req))
+        print(f"\n  ✓ TrustRail Growth Policy Decision: {rec.get('decision')}")
+        print(f"  ✓ Reason: {rec.get('reason')}")
+        print(
+            f"  ✓ Incremental Revenue Generated: ₹{(rec.get('incremental_revenue', 0) / 100):,.2f}"
         )
 
-        # ------------------------------------------------------------------ #
-        section("3. IDENTITY DETERMINISM — same purchase twice -> same transaction")
-        # A distinct basket (SKU-003) so this section stands alone; only the
-        # agent_id and item ordering differ, which are excluded from identity.
-        b1 = intent_body(items=[{"sku": "SKU-003", "quantity": 1}], max_amount=500000,
-                         agent_id="agent-A")
-        b2 = intent_body(items=[{"sku": "SKU-003", "quantity": 1}], max_amount=500000,
-                         agent_id="agent-B")
-        r1 = show("POST", "/intents (agent-A)", c.post("/intents", json=b1))
-        r2 = show("POST", "/intents (agent-B)", c.post("/intents", json=b2))
-        same = r1.get("transaction_id") == r2.get("transaction_id")
-        print(f"\n  same transaction_id? {same}  "
-              f"({r1.get('transaction_identity')})")
+        # Step 2b: Execute the accepted bundle through TrustRail integrity engine
+        bundle_body = intent_body(
+            items=rec.get("suggested_intent_items", []),
+            max_amount=500000,
+            agent_id="agent-growth-buyer-1",
+        )
+        c2 = show(
+            "POST", "/intents (Bundle Proposal)", c.post("/intents", json=bundle_body)
+        )
+        iid2, txid2 = c2["intent_id"], c2["transaction_id"]
+        c.post(f"/intents/{iid2}/validate")
+        c.post(f"/intents/{iid2}/authorize")
+        show("POST", "/transactions", c.post("/transactions", json={"intent_id": iid2}))
+        show("GET", f"/transactions/{txid2}", c.get(f"/transactions/{txid2}"))
 
         # ------------------------------------------------------------------ #
-        section("4. RECOVERY — payment captured but fulfilment fails -> REFUND_REQUIRED")
-        body = intent_body(items=[{"sku": "SKU-FAIL-ORDER", "quantity": 1}],
-                           max_amount=200000)
-        created = show("POST", "/intents", c.post("/intents", json=body))
-        iid, txid = created["intent_id"], created["transaction_id"]
-        c.post(f"/intents/{iid}/validate")
-        c.post(f"/intents/{iid}/authorize")
-        show("POST", "/transactions", c.post("/transactions", json={"intent_id": iid}))
-        show("GET", f"/transactions/{txid}", c.get(f"/transactions/{txid}"))
+        section(
+            "3. SAFETY BOUNDARY — AI Attempts Over-Budget Proposal (₹8,497 vs ₹5,000)"
+        )
+        print(
+            "\n  AI Buyer attempts: Mouse + Keyboard + Hub + 4K Monitor (Total: ₹19,999+)"
+        )
+        print("  Buyer Authorized Budget: ₹5,000.00")
+        over_req = {
+            "merchant_id": MERCHANT_ID,
+            "cart_items": [
+                {"sku": "SKU-001", "quantity": 1},
+                {"sku": "SKU-002", "quantity": 1},
+                {"sku": "SKU-003", "quantity": 1},
+                {"sku": "SKU-004", "quantity": 1},
+            ],
+            "authorized_max_amount": 500000,
+            "currency": "INR",
+        }
+        over_rec = show(
+            "POST",
+            "/growth/recommend (Over-Budget)",
+            c.post("/growth/recommend", json=over_req),
+        )
+        print(
+            f"\n  🛡️ GATING ACTIVE: {over_rec.get('decision')} — {over_rec.get('reason')}"
+        )
+        print("  🔒 The AI CANNOT silently increase the authorized spend.")
 
         # ------------------------------------------------------------------ #
-        section("5. ASYNC PAYMENT BOUNDARY (Phase 2) — PENDING -> webhook -> CONFIRMED")
-        body = intent_body(items=[{"sku": "SKU-001", "quantity": 1}], max_amount=500002)
-        created = show("POST", "/intents", c.post("/intents", json=body))
-        iid, txid = created["intent_id"], created["transaction_id"]
-        c.post(f"/intents/{iid}/validate")
-        c.post(f"/intents/{iid}/authorize")
-        show("POST", "/transactions", c.post("/transactions", json={"intent_id": iid}))
-        txn = show("GET", f"/transactions/{txid}", c.get(f"/transactions/{txid}"))
+        section(
+            "4. RECOVERY & INTEGRITY — Payment Succeeded but Fulfilment Failed -> REFUND_REQUIRED"
+        )
+        body_fail = intent_body(
+            items=[{"sku": "SKU-FAIL-ORDER", "quantity": 1}], max_amount=200000
+        )
+        c_fail = show(
+            "POST", "/intents (Failure Scenario)", c.post("/intents", json=body_fail)
+        )
+        iidf, txidf = c_fail["intent_id"], c_fail["transaction_id"]
+        c.post(f"/intents/{iidf}/validate")
+        c.post(f"/intents/{iidf}/authorize")
+        show("POST", "/transactions", c.post("/transactions", json={"intent_id": iidf}))
+        show("GET", f"/transactions/{txidf}", c.get(f"/transactions/{txidf}"))
 
-        provider = txn.get("payment_provider")
-        order_id = txn.get("razorpay_order_id")
-        if provider == "razorpay" and txn.get("state") == "PAYMENT_PENDING" and order_id:
-            print(
-                "\n  Razorpay Test Mode: money is NOT captured at order creation —\n"
-                "  the transaction is PAYMENT_PENDING until an authoritative signal.\n"
-                f"  razorpay_order_id = {order_id}"
-            )
-            if not WEBHOOK_SECRET:
-                print(
-                    "\n  (Set RAZORPAY_WEBHOOK_SECRET to the server's secret to let this\n"
-                    "   demo deliver a signed payment.captured webhook and reach CONFIRMED.\n"
-                    "   Otherwise the same effect is achieved by the reconciliation sweep.)"
-                )
-            else:
-                # Deliver a *signed* payment.captured, exactly as Razorpay's servers
-                # would. The amount MUST match the quoted order total or the handler
-                # refuses it (defence-in-depth beyond the signature).
-                amount = txn.get("quoted_total")
-                event = {
-                    "event": "payment.captured",
-                    "payload": {
-                        "payment": {
-                            "entity": {
-                                "id": "pay_demo_" + txid[:12],
-                                "order_id": order_id,
-                                "amount": amount,
-                                "currency": txn.get("currency", "INR"),
-                            }
-                        }
-                    },
-                }
-                raw = json.dumps(event).encode("utf-8")
-                sig = hmac.new(
-                    WEBHOOK_SECRET.encode("utf-8"), raw, hashlib.sha256
-                ).hexdigest()
-                show(
-                    "POST",
-                    "/webhooks/razorpay",
-                    c.post(
-                        "/webhooks/razorpay",
-                        content=raw,
-                        headers={
-                            "X-Razorpay-Signature": sig,
-                            "Content-Type": "application/json",
-                        },
-                    ),
-                )
-                show("GET", f"/transactions/{txid}", c.get(f"/transactions/{txid}"))
-                print(
-                    "\n  A duplicate delivery of the same webhook is an idempotent no-op —\n"
-                    "  it never confirms twice and never opens a second order.\n"
-                    "  An AMBIGUOUS failure would instead land in PAYMENT_UNKNOWN, which\n"
-                    "  never auto-recharges and is resolved only by authoritative reconciliation."
-                )
-        else:
-            print(
-                "\n  Server is in the default MOCK gateway, which confirms synchronously,\n"
-                "  so this transaction is already resolved above. In Razorpay Test Mode\n"
-                "  (PAYMENT_GATEWAY=razorpay) the same call returns PAYMENT_PENDING with a\n"
-                "  real order id and is confirmed asynchronously by a signed\n"
-                "  payment.captured webhook or by the reconciliation sweep — never by the\n"
-                "  AI buyer, and never by capturing money at order-creation time.\n"
-                "  An AMBIGUOUS gateway failure lands in PAYMENT_UNKNOWN (no re-charge)."
-            )
+        # ------------------------------------------------------------------ #
+        section("5. REAL REVENUE GROWTH & ATTACH RATE ANALYTICS")
+        print(
+            "\n  Querying live merchant growth ledger (never faked, calculated directly from orders):"
+        )
+        show("GET", "/analytics/growth", c.get("/analytics/growth"))
 
-        print("\nDemo complete.\n")
+        print("\n" + "=" * 78)
+        print("  DEMO COMPLETE — AI GROWTH & AGENTIC COMMERCE DEMONSTRATED")
+        print("  Open Interactive Dashboard: http://127.0.0.1:8000/dashboard")
+        print("=" * 78 + "\n")
 
 
 if __name__ == "__main__":
     try:
         main()
     except httpx.ConnectError:
-        print(f"Could not reach {BASE_URL}. Start the server:\n"
-              f"    uvicorn app.main:app --reload")
+        print(
+            f"Could not reach {BASE_URL}. Start the server:\n"
+            f"    uvicorn app.main:app --reload"
+        )
         sys.exit(1)

@@ -65,7 +65,11 @@ def process_razorpay_event(
     txn = lock_transaction_by_order_id(db, str(order_id))
     if txn is None:
         # Never fabricate state from an unmatched event.
-        return {"status": "unmatched", "reason": "no transaction for order", "order_id": order_id}
+        return {
+            "status": "unmatched",
+            "reason": "no transaction for order",
+            "order_id": order_id,
+        }
 
     # Record receipt of every webhook (including retries) for the audit trail.
     audit.record(

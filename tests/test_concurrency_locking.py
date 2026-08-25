@@ -60,7 +60,9 @@ def test_lock_helpers_return_the_right_row(client_rz, make_payload, svc_session)
     created = _drive_to_pending(client_rz, make_payload, max_amount=500000)
     order_id = _order_id(client_rz, created["transaction_id"])
 
-    by_identity = lock_transaction_by_identity(svc_session, created["transaction_identity"])
+    by_identity = lock_transaction_by_identity(
+        svc_session, created["transaction_identity"]
+    )
     by_order = lock_transaction_by_order_id(svc_session, order_id)
     assert by_identity is not None
     assert by_order is not None
@@ -84,17 +86,31 @@ def test_webhook_then_reconcile_converge_to_single_completion(
 
     # 1) the webhook resolves it first
     body = json.dumps(
-        {"event": "payment.captured",
-         "payload": {"payment": {"entity": {
-             "id": "pay_1", "order_id": order_id,
-             "amount": CAPTURE_AMOUNT, "currency": "INR", "status": "captured"}}}}
+        {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_1",
+                        "order_id": order_id,
+                        "amount": CAPTURE_AMOUNT,
+                        "currency": "INR",
+                        "status": "captured",
+                    }
+                }
+            },
+        }
     ).encode()
-    client_rz.post("/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _sign(body)})
+    client_rz.post(
+        "/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _sign(body)}
+    )
 
     # 2) a reconciliation sweep runs afterwards for the same order
     out = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     assert out.action == "skipped"  # nothing left to do; no second confirm/order
 
@@ -114,17 +130,31 @@ def test_reconcile_then_webhook_converge_to_single_completion(
 
     # 1) reconciliation resolves it first
     reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     # 2) the (delayed) webhook arrives afterwards -> idempotent no-op
     body = json.dumps(
-        {"event": "payment.captured",
-         "payload": {"payment": {"entity": {
-             "id": "pay_1", "order_id": order_id,
-             "amount": CAPTURE_AMOUNT, "currency": "INR", "status": "captured"}}}}
+        {
+            "event": "payment.captured",
+            "payload": {
+                "payment": {
+                    "entity": {
+                        "id": "pay_1",
+                        "order_id": order_id,
+                        "amount": CAPTURE_AMOUNT,
+                        "currency": "INR",
+                        "status": "captured",
+                    }
+                }
+            },
+        }
     ).encode()
-    r = client_rz.post("/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _sign(body)})
+    r = client_rz.post(
+        "/webhooks/razorpay", content=body, headers={"X-Razorpay-Signature": _sign(body)}
+    )
     assert r.status_code == 200
 
     txn = client_rz.get(f"/transactions/{created['transaction_id']}").json()

@@ -12,6 +12,8 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from app import __version__
+from app.api.chat import router as chat_router
+from app.api.growth import router as growth_router
 from app.api.intents import router as intents_router
 from app.api.transactions import router as transactions_router
 from app.api.webhooks import router as webhooks_router
@@ -30,14 +32,15 @@ from app.errors import (
 )
 from app.merchant.catalogue import seed_merchant
 from app.merchant.router import router as merchant_router
+from app.ui.dashboard import router as dashboard_router
 
 DESCRIPTION = """
-**TrustRail** is a deterministic safety & transaction-orchestration layer between
-an autonomous **AI buyer**, a **merchant** backend, and (Phase 2) **Razorpay**.
+**TrustRail** is an **AI Growth & Agentic Commerce Engine** built with a deterministic
+safety, transaction-integrity, and recovery layer between an autonomous **AI buyer**,
+a **merchant** backend, and **Razorpay** (Test Mode).
 
-The AI can *propose* a purchase; TrustRail decides whether it is *executable*.
-Every financial decision is deterministic, gated, idempotent, state-aware,
-recoverable and auditable. The LLM never authorizes payment and never sets state.
+The AI helps the merchant **sell more** via bounded upsells, bundles, cross-sells,
+and recovery offers, while TrustRail guarantees the AI can **never exceed** user authority.
 """
 
 
@@ -104,6 +107,9 @@ app.include_router(intents_router)
 app.include_router(transactions_router)
 app.include_router(merchant_router)
 app.include_router(webhooks_router)
+app.include_router(growth_router)
+app.include_router(chat_router)
+app.include_router(dashboard_router)
 
 
 @app.get("/", tags=["meta"])
@@ -111,10 +117,13 @@ def root() -> dict:
     return {
         "name": "TrustRail",
         "version": __version__,
-        "tagline": "Agentic Transaction Integrity & Recovery Engine",
+        "tagline": "AI Growth & Agentic Commerce Engine",
+        "track": "Track 01: AI Growth & Agentic Commerce",
         "docs": "/docs",
+        "dashboard": "/dashboard",
         "health": "/health",
         "agent_card": "/merchant/agent-card",
+        "growth_analytics": "/analytics/growth",
     }
 
 

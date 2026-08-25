@@ -640,9 +640,7 @@ def fail_payment(
     """
     current = S(txn.state)
     if current == S.PAYMENT_FAILED:
-        return txn, PolicyResult(
-            decision=Decision.BLOCK, reason="payment already failed"
-        )
+        return txn, PolicyResult(decision=Decision.BLOCK, reason="payment already failed")
     if current not in _RESOLVABLE or not can_transition(current, S.PAYMENT_FAILED):
         audit.record(
             db,
@@ -797,7 +795,8 @@ def execute_transaction(
     if current in _EXECUTION_IN_FLIGHT_OR_DONE:
         decision = (
             Decision.ALLOW
-            if current in {S.PAYMENT_PENDING, S.PAYMENT_CONFIRMED, S.ORDER_CONFIRMED, S.COMPLETED}
+            if current
+            in {S.PAYMENT_PENDING, S.PAYMENT_CONFIRMED, S.ORDER_CONFIRMED, S.COMPLETED}
             else Decision.BLOCK
         )
         result = PolicyResult(

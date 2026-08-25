@@ -41,11 +41,11 @@ def lock_transaction_by_identity(
     return db.scalar(stmt)
 
 
-def lock_transaction_by_order_id(db: Session, razorpay_order_id: str) -> Transaction | None:
+def lock_transaction_by_order_id(
+    db: Session, razorpay_order_id: str
+) -> Transaction | None:
     """Fetch a transaction by its Razorpay order id, locking the row on Postgres."""
-    stmt = select(Transaction).where(
-        Transaction.razorpay_order_id == razorpay_order_id
-    )
+    stmt = select(Transaction).where(Transaction.razorpay_order_id == razorpay_order_id)
     if _locking(db):
         stmt = stmt.with_for_update()
     return db.scalar(stmt)

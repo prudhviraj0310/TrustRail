@@ -12,9 +12,11 @@ from sqlalchemy.orm import Session
 
 from app.db import get_db
 from app.errors import InsufficientInventory, MerchantOrderFailed, ProductNotFound
+from app.merchant import growth as growth_service
 from app.merchant import service
 from app.merchant.catalogue import MERCHANT_ID
 from app.models.merchant import MerchantOrder, MerchantProduct
+from app.schemas.growth import BundleOut, OfferOut
 from app.schemas.merchant import (
     AgentCommerceManifestOut,
     CheckoutValidateIn,
@@ -156,3 +158,23 @@ def cancel_order(order_id: str, db: Session = Depends(get_db)) -> OrderOut:
     except OrderNotFound as exc:
         raise HTTPException(status.HTTP_404_NOT_FOUND, str(exc)) from exc
     return _order_out(order)
+
+
+@router.get(
+    "/offers",
+    response_model=list[OfferOut],
+    summary="List merchant cross-sell & promotional offers",
+)
+def list_offers() -> list[OfferOut]:
+    """Expose available cross-sells and promotional add-on opportunities to AI buyers."""
+    return growth_service.list_active_offers()
+
+
+@router.get(
+    "/bundles",
+    response_model=list[BundleOut],
+    summary="List merchant product bundles with savings",
+)
+def list_bundles() -> list[BundleOut]:
+    """Expose discounted product bundles to AI buyers."""
+    return growth_service.list_active_bundles()

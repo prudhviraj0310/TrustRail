@@ -267,7 +267,9 @@ class RazorpayGateway:
     # ---- capture (TrustRail-controlled; never the AI) -------------------- #
     def capture_payment(self, payment_id: str, amount: int, currency: str) -> dict:
         """Capture an authorized payment for exactly ``amount`` minor units."""
-        return dict(self._client.payment.capture(payment_id, int(amount), {"currency": currency}))
+        return dict(
+            self._client.payment.capture(payment_id, int(amount), {"currency": currency})
+        )
 
     # ---- refund (used by the refund service) ----------------------------- #
     def refund_payment(

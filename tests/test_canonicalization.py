@@ -17,12 +17,16 @@ def _intent(make_payload, **kw) -> PurchaseIntentIn:
 # --- identity is order/case/whitespace independent ------------------------- #
 def test_item_order_does_not_change_identity(make_payload):
     a = canonicalize(
-        _intent(make_payload, items=[{"sku": "SKU-001", "quantity": 1},
-                                     {"sku": "SKU-002", "quantity": 1}])
+        _intent(
+            make_payload,
+            items=[{"sku": "SKU-001", "quantity": 1}, {"sku": "SKU-002", "quantity": 1}],
+        )
     )
     b = canonicalize(
-        _intent(make_payload, items=[{"sku": "SKU-002", "quantity": 1},
-                                     {"sku": "SKU-001", "quantity": 1}])
+        _intent(
+            make_payload,
+            items=[{"sku": "SKU-002", "quantity": 1}, {"sku": "SKU-001", "quantity": 1}],
+        )
     )
     assert a.transaction_identity == b.transaction_identity
 
@@ -35,8 +39,11 @@ def test_sku_case_and_whitespace_normalised(make_payload):
 
 def test_duplicate_skus_merge_by_summing_quantity(make_payload):
     merged = canonicalize(
-        _intent(make_payload, items=[{"sku": "SKU-001", "quantity": 1},
-                                     {"sku": "SKU-001", "quantity": 1}], max_quantity=5)
+        _intent(
+            make_payload,
+            items=[{"sku": "SKU-001", "quantity": 1}, {"sku": "SKU-001", "quantity": 1}],
+            max_quantity=5,
+        )
     )
     single = canonicalize(
         _intent(make_payload, items=[{"sku": "SKU-001", "quantity": 2}], max_quantity=5)
@@ -48,8 +55,12 @@ def test_duplicate_skus_merge_by_summing_quantity(make_payload):
 
 # --- material differences DO change identity ------------------------------- #
 def test_quantity_change_changes_identity(make_payload):
-    one = canonicalize(_intent(make_payload, items=[{"sku": "SKU-001", "quantity": 1}], max_quantity=5))
-    two = canonicalize(_intent(make_payload, items=[{"sku": "SKU-001", "quantity": 2}], max_quantity=5))
+    one = canonicalize(
+        _intent(make_payload, items=[{"sku": "SKU-001", "quantity": 1}], max_quantity=5)
+    )
+    two = canonicalize(
+        _intent(make_payload, items=[{"sku": "SKU-001", "quantity": 2}], max_quantity=5)
+    )
     assert one.transaction_identity != two.transaction_identity
 
 
@@ -81,10 +92,16 @@ def test_merchant_change_changes_identity(make_payload):
 def test_agent_and_expiry_excluded_from_identity(make_payload, frozen_now):
     from datetime import timedelta
 
-    a = canonicalize(_intent(make_payload, agent_id="agent-A",
-                             expires_at=frozen_now + timedelta(hours=1)))
-    b = canonicalize(_intent(make_payload, agent_id="agent-Z",
-                             expires_at=frozen_now + timedelta(days=30)))
+    a = canonicalize(
+        _intent(
+            make_payload, agent_id="agent-A", expires_at=frozen_now + timedelta(hours=1)
+        )
+    )
+    b = canonicalize(
+        _intent(
+            make_payload, agent_id="agent-Z", expires_at=frozen_now + timedelta(days=30)
+        )
+    )
     assert a.transaction_identity == b.transaction_identity
     # ...and the canonical form literally does not carry those fields.
     assert "agent_id" not in a.canonical

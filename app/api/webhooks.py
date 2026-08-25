@@ -60,9 +60,7 @@ async def razorpay_webhook(
     try:
         event = json.loads(raw_body.decode("utf-8"))
     except (ValueError, UnicodeDecodeError):
-        return JSONResponse(
-            status_code=400, content={"error": "malformed webhook body"}
-        )
+        return JSONResponse(status_code=400, content={"error": "malformed webhook body"})
 
     outcome = webhook_service.process_razorpay_event(db, event, clock=clock)
     # 200 for anything we accepted-and-recorded so Razorpay stops retrying.

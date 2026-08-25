@@ -86,7 +86,9 @@ def test_4_wrong_merchant_blocks(client, make_payload):
 # TEST 5 — wrong SKU -> BLOCK
 # --------------------------------------------------------------------------- #
 def test_5_wrong_sku_blocks(client, make_payload):
-    created = create(client, make_payload(items=[{"sku": "SKU-DOES-NOT-EXIST", "quantity": 1}]))
+    created = create(
+        client, make_payload(items=[{"sku": "SKU-DOES-NOT-EXIST", "quantity": 1}])
+    )
     result = validate(client, created["intent_id"])
     assert result["decision"]["decision"] == "BLOCK"
     assert result["state"] == S.INVALID.value
@@ -139,8 +141,12 @@ def test_7_same_canonical_intent_same_identity(client, make_payload, frozen_now)
 # TEST 8 — different quantity -> different transaction identity
 # --------------------------------------------------------------------------- #
 def test_8_different_quantity_different_identity(client, make_payload):
-    one = create(client, make_payload(items=[{"sku": "SKU-001", "quantity": 1}], max_quantity=5))
-    two = create(client, make_payload(items=[{"sku": "SKU-001", "quantity": 2}], max_quantity=5))
+    one = create(
+        client, make_payload(items=[{"sku": "SKU-001", "quantity": 1}], max_quantity=5)
+    )
+    two = create(
+        client, make_payload(items=[{"sku": "SKU-001", "quantity": 2}], max_quantity=5)
+    )
     assert one["transaction_identity"] != two["transaction_identity"]
     assert one["transaction_id"] != two["transaction_id"]
 

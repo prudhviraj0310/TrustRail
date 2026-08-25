@@ -102,7 +102,11 @@ def _record(
 
 
 def _outcome(
-    txn: Transaction, from_state: str, action: str, detail: str, refund_id: str | None = None
+    txn: Transaction,
+    from_state: str,
+    action: str,
+    detail: str,
+    refund_id: str | None = None,
 ) -> RefundOutcome:
     return RefundOutcome(
         transaction_id=txn.id,
@@ -142,10 +146,14 @@ def refund_transaction(
         return _outcome(txn, from_state, "already_refunded", "refund already issued")
 
     if S(txn.state) != S.REFUND_REQUIRED:
-        return _outcome(txn, from_state, "skipped", f"state {txn.state} does not owe a refund")
+        return _outcome(
+            txn, from_state, "skipped", f"state {txn.state} does not owe a refund"
+        )
 
     if not _is_capable(gateway):
-        return _outcome(txn, from_state, "not_capable", "gateway cannot refund (mock mode)")
+        return _outcome(
+            txn, from_state, "not_capable", "gateway cannot refund (mock mode)"
+        )
 
     # Idempotency guard: a refund id already persisted means Razorpay already
     # accepted a refund (we may have crashed before completing the transition).
@@ -154,7 +162,9 @@ def refund_transaction(
         complete_refund(
             db, txn, refund_id=txn.razorpay_refund_id, clock=clock, provider=PROVIDER
         )
-        return _outcome(txn, from_state, "refunded", "completed a previously-issued refund")
+        return _outcome(
+            txn, from_state, "refunded", "completed a previously-issued refund"
+        )
 
     payment_id = _payment_id_for(db, txn)
     amount = _refund_amount_for(db, txn)
@@ -201,7 +211,11 @@ def refund_transaction(
 
     complete_refund(db, txn, refund_id=refund_id, clock=clock, provider=PROVIDER)
     return _outcome(
-        txn, from_state, "refunded", f"refund {refund_id or '<none>'} issued; now {txn.state}", refund_id
+        txn,
+        from_state,
+        "refunded",
+        f"refund {refund_id or '<none>'} issued; now {txn.state}",
+        refund_id,
     )
 
 
@@ -225,6 +239,8 @@ def refund_pending(
         .all()
     )
     return [
-        refund_transaction(db, transaction_identity=identity, gateway=gateway, clock=clock)
+        refund_transaction(
+            db, transaction_identity=identity, gateway=gateway, clock=clock
+        )
         for identity in identities
     ]

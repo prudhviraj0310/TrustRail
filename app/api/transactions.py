@@ -39,9 +39,7 @@ def execute_transaction(
 
 
 @router.get("/{transaction_id}", response_model=TransactionOut)
-def get_transaction(
-    transaction_id: str, db: Session = Depends(get_db)
-) -> TransactionOut:
+def get_transaction(transaction_id: str, db: Session = Depends(get_db)) -> TransactionOut:
     txn = txn_service.get_transaction(db, transaction_id)
     return transaction_out(txn)
 

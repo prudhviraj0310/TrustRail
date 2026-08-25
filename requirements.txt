@@ -21,5 +21,10 @@ alembic==1.14.0
 #     offline test suite does not require network access or credentials. ---
 razorpay==2.0.1
 
+# --- Phase 3: AI Commerce Agent (Gemini-powered conversational buyer). ---
+#     When GEMINI_API_KEY is empty the agent falls back to intelligent
+#     rule-based responses, so the test suite stays fully offline. ---
+google-genai>=2.0.0
+
 # --- Test suite ---
 pytest==9.1.1

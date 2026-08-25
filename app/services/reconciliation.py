@@ -115,7 +115,9 @@ def _expected(db: Session, txn: Transaction) -> tuple[int | None, str | None]:
     return txn.quoted_total, txn.currency
 
 
-def _first_payment_with_status(payments: Sequence[dict], statuses: set[str]) -> dict | None:
+def _first_payment_with_status(
+    payments: Sequence[dict], statuses: set[str]
+) -> dict | None:
     for p in payments:
         if str(p.get("status") or "").lower() in statuses:
             return p
@@ -132,7 +134,9 @@ def _amount_matches(got, expected) -> bool:
         return False
 
 
-def _outcome(txn: Transaction, from_state: str, action: str, detail: str) -> ReconcileOutcome:
+def _outcome(
+    txn: Transaction, from_state: str, action: str, detail: str
+) -> ReconcileOutcome:
     return ReconcileOutcome(
         transaction_id=txn.id,
         transaction_identity=txn.transaction_identity,
@@ -203,7 +207,9 @@ def reconcile_transaction(
 
     from_state = txn.state
     if S(txn.state) not in RESOLVABLE_STATES:
-        return _outcome(txn, from_state, "skipped", f"state {txn.state} is not resolvable")
+        return _outcome(
+            txn, from_state, "skipped", f"state {txn.state} is not resolvable"
+        )
 
     if not _is_capable(gateway):
         return _outcome(
@@ -376,11 +382,15 @@ def _reconcile_locked(
                     "order_id": order_id,
                 },
             )
-            return _outcome(txn, from_state, "error", "authorized amount/currency mismatch")
+            return _outcome(
+                txn, from_state, "error", "authorized amount/currency mismatch"
+            )
 
         payment_id = str(authorized.get("id") or "")
         try:
-            gateway.capture_payment(payment_id, int(exp_amount), exp_currency or txn.currency)
+            gateway.capture_payment(
+                payment_id, int(exp_amount), exp_currency or txn.currency
+            )
         except Exception as exc:
             # Capture failed/uncertain — do NOT conclude anything. A later sweep or
             # webhook re-examines; if it was in fact captured we will see it then.

@@ -78,11 +78,19 @@ def test_happy_path_audit_answers_the_seven_questions(client, make_payload):
     actions = [e["action"] for e in events]
 
     # Who proposed, who decided, who paid, who fulfilled.
-    assert {"AI_BUYER", "POLICY_ENGINE", "PAYMENT_GATEWAY", "MERCHANT", "TRUSTRAIL"} <= actors
-    assert "INTENT_CREATED" in actions          # what the AI proposed
-    assert any(a.startswith("POLICY_EVALUATED") for a in actions)  # what TrustRail allowed
-    assert "PAYMENT_CONFIRMED" in actions        # what happened to payment
-    assert "ORDER_CONFIRMED" in actions          # what happened to the order
+    assert {
+        "AI_BUYER",
+        "POLICY_ENGINE",
+        "PAYMENT_GATEWAY",
+        "MERCHANT",
+        "TRUSTRAIL",
+    } <= actors
+    assert "INTENT_CREATED" in actions  # what the AI proposed
+    assert any(
+        a.startswith("POLICY_EVALUATED") for a in actions
+    )  # what TrustRail allowed
+    assert "PAYMENT_CONFIRMED" in actions  # what happened to payment
+    assert "ORDER_CONFIRMED" in actions  # what happened to the order
     assert "TRANSACTION_COMPLETED" in actions
     # strictly ordered
     seqs = [e["seq"] for e in events]
@@ -171,7 +179,9 @@ def test_payment_declined_moves_to_payment_failed(client, make_payload):
 def test_order_failure_after_payment_requires_refund(client, make_payload):
     # SKU-FAIL-ORDER: payment succeeds, fulfilment fails -> refund owed.
     payload = make_payload(
-        items=[{"sku": "SKU-FAIL-ORDER", "quantity": 1}], max_amount=200000, max_quantity=1
+        items=[{"sku": "SKU-FAIL-ORDER", "quantity": 1}],
+        max_amount=200000,
+        max_quantity=1,
     )
     created = create(client, payload)
     validate(client, created["intent_id"])
@@ -180,7 +190,7 @@ def test_order_failure_after_payment_requires_refund(client, make_payload):
 
     assert done["state"] == S.REFUND_REQUIRED.value
     txn = client.get(f"/transactions/{created['transaction_id']}").json()
-    assert txn["payment_ref"] is not None   # we DID capture money
+    assert txn["payment_ref"] is not None  # we DID capture money
     assert txn["merchant_order_id"] is None  # but there is no order
     actions = audit_actions(client, created["transaction_id"])
     assert "PAYMENT_CONFIRMED" in actions
@@ -197,9 +207,13 @@ def test_out_of_stock_blocks_at_validation(client, make_payload):
     assert result["state"] == S.POLICY_BLOCKED.value
 
 
-def test_expired_after_authorization_blocks_at_execute(client, make_payload, clock, frozen_now):
+def test_expired_after_authorization_blocks_at_execute(
+    client, make_payload, clock, frozen_now
+):
     # Authorize while valid, then let the clock roll past expiry before executing.
-    payload = make_payload(max_amount=500000, expires_at=frozen_now + timedelta(minutes=30))
+    payload = make_payload(
+        max_amount=500000, expires_at=frozen_now + timedelta(minutes=30)
+    )
     created = create(client, payload)
     validate(client, created["intent_id"])
     authorize(client, created["intent_id"])

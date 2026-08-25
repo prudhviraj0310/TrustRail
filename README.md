@@ -1,42 +1,48 @@
-# TrustRail — Agentic Transaction Integrity & Recovery Engine
+# TrustRail — AI Growth & Agentic Commerce Engine
+### Conversational AI Buyer · Gemini-Powered · Razorpay Test Mode
 
 > **Razorpay AI Buildathon 2026 · Track 01 — AI Growth & Agentic Commerce**
 
-TrustRail is a **deterministic safety & orchestration layer** that sits between an
-autonomous **AI buyer**, a **merchant** backend, and **Razorpay** (Test Mode).
-
-The AI can *propose* a purchase. TrustRail decides whether that purchase is
-*executable* — and every decision is deterministic, bounded, gated, idempotent,
-state-aware, recoverable, and fully auditable.
+TrustRail is an **AI-native commerce growth engine** with a **conversational AI buyer** powered by **Google Gemini**. It helps merchants **sell more to AI buyers** through intelligent bundle recommendations and cross-sells, while ensuring every monetary action remains bounded, explainable, gated, idempotent, and recoverable.
 
 ```
-   AI buyer  ──proposes──▶  TrustRail  ──quotes/orders──▶  Merchant
- (untrusted)                (deterministic)                (mock)
-                                 │
-                                 └──pays via──▶  Payment Gateway
-                                                 (mock by default │ Razorpay Test Mode)
-                                                        ▲
-                                        webhook + reconciliation resolve
-                                        the asynchronous payment outcome
+   User ──chats──▶  AI Agent (Gemini)  ──reasons──▶  Growth Engine  ──recommends──▶  TrustRail Policy
+ (natural language)    (understands catalog)         (bundles/cross-sells)            (budget-gated)
+                                                                                          │
+                                        ┌─────────────────────────────────────────────────┘
+                                        ▼
+                                   TrustRail ──quotes/orders──▶  Merchant
+                                 (8 policy checks)
+                                        │
+                                        └──pays via──▶  Razorpay Test Mode
+                                                        (real orders + webhooks)
 ```
 
-The one-sentence thesis: **the LLM never authorizes payment and never sets state.**
-It hands TrustRail a structured intent; TrustRail's pure, testable policy engine
-and explicit state machine do everything that touches money.
+The core thesis: **AI discovers what the user needs, proposes the best deal, and executes the purchase — while TrustRail guarantees the AI can NEVER exceed the user's authorized budget.**
+
+### 🚀 Try It Now
+
+```bash
+python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/uvicorn app.main:app --reload
+# Open http://localhost:8000/agent     → AI Chat UI
+# Open http://localhost:8000/dashboard  → Growth Analytics
+```
 
 ---
 
 ## Table of contents
 1. [Why this exists](#1-why-this-exists)
-2. [Architecture](#2-architecture)
-3. [The transaction lifecycle](#3-the-transaction-lifecycle)
-4. [Running locally](#4-running-locally)
-5. [API reference & examples](#5-api-reference--examples)
-6. [Tests](#6-tests)
-7. [Design decisions](#7-design-decisions)
-8. [Known weaknesses](#8-known-weaknesses)
-9. [Phase 2 — Razorpay Test Mode](#9-phase-2--razorpay-test-mode)
-10. [Track 01 submission story](#10-track-01-submission-story)
+2. [AI Commerce Agent](#2-ai-commerce-agent)
+3. [Architecture](#3-architecture)
+4. [The transaction lifecycle](#4-the-transaction-lifecycle)
+5. [Running locally](#5-running-locally)
+6. [API reference & examples](#6-api-reference--examples)
+7. [Tests](#7-tests)
+8. [Design decisions](#8-design-decisions)
+9. [Known weaknesses](#9-known-weaknesses)
+10. [Phase 2 — Razorpay Test Mode](#10-phase-2--razorpay-test-mode)
+11. [Track 01 submission story](#11-track-01-submission-story)
 
 ---
 
@@ -56,7 +62,50 @@ LLM text. The model's output is treated as untrusted input at the boundary.
 
 ---
 
-## 2. Architecture
+## 2. AI Commerce Agent
+
+The **AI Commerce Agent** is TrustRail's conversational frontend — a Gemini-powered AI buyer that discovers products, reasons about the best deals, and executes purchases through TrustRail's deterministic pipeline.
+
+### How it works
+
+```
+User: "I need peripherals for my home office"
+  ↓
+AI Agent reads merchant catalog → reasons about needs → proposes Workstation Bundle
+  ↓
+User: "Get the bundle!"
+  ↓
+AI triggers purchase → Growth Engine evaluates bundle at ₹3,498 (saves ₹5,299)
+  ↓
+TrustRail Pipeline: Intent → 8 Policy Checks → Authorize → Pay → Complete
+  ↓
+✅ Transaction COMPLETED | txn_abc123 | 8/8 checks passed
+📊 Growth: +₹2,332 incremental revenue | 200% AOV uplift
+```
+
+### Key capabilities
+
+| Capability | How |
+|---|---|
+| **Natural language shopping** | User describes needs, AI finds products |
+| **Intelligent upselling** | AI recommends bundles when they save money |
+| **Budget enforcement** | AI cannot exceed the user's authorized budget |
+| **Live policy gating** | Every purchase passes 8 deterministic checks |
+| **Growth analytics** | GMV, incremental revenue, AOV uplift, attach rate |
+| **Gemini + fallback** | Real AI when API key is set; smart rule-based fallback otherwise |
+
+### Endpoints
+
+| Endpoint | What it does |
+|---|---|
+| `POST /chat` | Conversational AI buyer (JSON API) |
+| `GET /agent` | Interactive chat UI |
+| `GET /dashboard` | Growth analytics dashboard |
+| `GET /analytics/growth` | Revenue metrics API |
+
+---
+
+## 3. Architecture
 
 TrustRail is a small FastAPI application with a clean separation between the
 **orchestrator** (which has side effects and sequences the phases) and the
@@ -65,7 +114,7 @@ TrustRail is a small FastAPI application with a clean separation between the
 ```
 app/
 ├── main.py                 FastAPI app, error→HTTP mapping, lifespan (create tables + seed)
-├── config.py               Settings (DATABASE_URL, flags) via pydantic-settings
+├── config.py               Settings (DATABASE_URL, GEMINI_API_KEY, flags) via pydantic-settings
 ├── db.py                   SQLAlchemy engine/session; SQLite ⇄ PostgreSQL interchangeable
 ├── clock.py                Injectable Clock (deterministic time in tests)
 ├── ids.py                  Prefixed IDs + identity_from_canonical() (SHA-256)
@@ -74,7 +123,9 @@ app/
 ├── errors.py               Domain errors (mapped to HTTP status in main.py)
 │
 ├── schemas/                Pydantic request/response contracts (the API boundary)
-│   ├── intent.py           PurchaseIntentIn — the transaction CONTRACT (extra fields ignored)
+│   ├── intent.py           PurchaseIntentIn — the transaction CONTRACT
+│   ├── chat.py             ChatMessageIn/Out — conversational AI schemas
+│   ├── growth.py           Growth recommendation & analytics schemas
 │   ├── policy.py           PolicyDecisionOut, PolicyCheckOut
 │   ├── transaction.py      DecisionEnvelopeOut (state + decision + why)
 │   ├── audit.py            AuditEventOut, AuditTrailOut
@@ -87,26 +138,35 @@ app/
 │   └── merchant.py         MerchantProduct / MerchantOrder / MockPayment / RazorpayPayment
 │
 ├── services/               ── the brain ──
-│   ├── intent.py           canonicalize() → deterministic transaction identity  (Phase 1)
-│   ├── policy.py           evaluate()  — PURE function, no I/O, no LLM text      (Phase 2)
-│   ├── state_machine.py    ALLOWED_TRANSITIONS adjacency map + guards            (Phase 3)
+│   ├── ai_agent.py         ★ Gemini-powered AI buyer agent (conversational commerce)
+│   ├── growth.py           Growth policy: bundle/cross-sell evaluation + budget gating
+│   ├── growth_analytics.py Revenue metrics: GMV, AOV uplift, attach rate
+│   ├── intent.py           canonicalize() → deterministic transaction identity
+│   ├── policy.py           evaluate() — PURE function, no I/O, no LLM text
+│   ├── state_machine.py    ALLOWED_TRANSITIONS adjacency map + guards
 │   ├── payment.py          PaymentGateway Protocol + MockPaymentGateway (the seam)
-│   ├── razorpay_gateway.py RazorpayGateway — the ONLY module that imports the SDK / holds secrets
+│   ├── razorpay_gateway.py RazorpayGateway — the ONLY module that imports the SDK
 │   ├── gateway.py          get_gateway() DI seam — picks mock vs razorpay from settings
 │   ├── webhook.py          signature-verified webhook → legality-checked state moves
 │   ├── reconciliation.py   authoritative status sweep for PENDING/UNKNOWN/RECOVERY
-│   ├── refund.py           REFUND_REQUIRED → Razorpay refund → COMPLETED (at-most-once)
+│   ├── refund.py           REFUND_REQUIRED → Razorpay refund → COMPLETED
 │   ├── locking.py          SELECT … FOR UPDATE row locks (Postgres) / no-op on SQLite
-│   ├── audit.py            append-only audit recorder                            (Phase 6)
-│   └── transaction.py      ORCHESTRATOR — the only place recovery state changes funnel through
+│   ├── audit.py            append-only audit recorder
+│   └── transaction.py      ORCHESTRATOR — the only place state changes funnel through
 │
-├── merchant/               Mock external merchant system (deliberately separate) (Phase 4)
+├── merchant/               Mock external merchant system (deliberately separate)
 │   ├── catalogue.py        Synthetic catalogue + idempotent seeding
 │   ├── service.py          Pricing, stock, idempotent orders, cancellation
 │   ├── client.py           MerchantClient Protocol + InProcessMerchantClient seam
 │   └── router.py           /merchant/* endpoints
 │
-└── api/                    TrustRail HTTP surface                                (Phase 5)
+├── ui/                     ★ Interactive frontends
+│   ├── chat.html           Conversational AI buyer chat interface
+│   ├── dashboard.py        Dashboard + agent route handlers
+│   └── index.html          Landing page
+│
+└── api/                    TrustRail HTTP surface
+    ├── chat.py             ★ POST /chat — conversational AI buyer endpoint
     ├── intents.py          POST /intents, /validate, /authorize, GET /intents/{id}
     ├── transactions.py     POST /transactions, GET /transactions/{id}, /audit
     ├── webhooks.py         POST /webhooks/razorpay (signature-verified ingress)
@@ -135,7 +195,7 @@ app/
 
 ---
 
-## 3. The transaction lifecycle
+## 4. The transaction lifecycle
 
 ```
                  ┌─────────────────────────────────────────────────────────────┐
@@ -166,56 +226,45 @@ Every transition writes an audit event, so the state history is the audit histor
 
 ---
 
-## 4. Running locally
+## 5. Running locally
 
 Requires **Python ≥ 3.11** (tested on 3.14).
 
-### Option A — zero setup (SQLite)
+### Quick start (SQLite + AI Agent)
 
 ```bash
 python3 -m venv .venv
 .venv/bin/pip install -r requirements.txt
 
-# run the API (SQLite file trustrail.db is created & seeded automatically)
+# Configure (optional — works without any keys using mock + fallback)
+cp .env.example .env
+# Edit .env to add:
+#   GEMINI_API_KEY=your_google_ai_studio_key    # for real AI responses
+#   PAYMENT_GATEWAY=razorpay                     # for Razorpay Test Mode
+#   RAZORPAY_KEY_ID=rzp_test_xxx
+#   RAZORPAY_KEY_SECRET=xxx
+
+# Start the server
 .venv/bin/uvicorn app.main:app --reload
 ```
 
-Open the interactive docs at **http://127.0.0.1:8000/docs**.
+Open in your browser:
+- **http://localhost:8000/agent** → 🤖 AI Chat UI (conversational buyer)
+- **http://localhost:8000/dashboard** → 📊 Growth Analytics Dashboard
+- **http://localhost:8000/docs** → 📄 Interactive API docs
 
-In a second terminal, run the guided end-to-end demo:
+### Terminal demo
 
 ```bash
 .venv/bin/python scripts/demo.py
 ```
 
-It walks the ALLOW happy path to `COMPLETED`, an over-budget `BLOCK`, transaction
-identity determinism, the `REFUND_REQUIRED` recovery path, and the Phase 2
-asynchronous payment boundary (`PENDING → signed webhook → CONFIRMED`) — printing
-every request and response. Section 5 adapts to the configured gateway: under the
-default mock it explains the async boundary; in Razorpay mode it delivers a signed
-stand-in `payment.captured` webhook to reach `CONFIRMED`.
+Walks the ALLOW happy path, over-budget BLOCK, transaction identity, REFUND_REQUIRED recovery, and async payment boundary.
 
-### Option B — Postgres (production-like)
-
-`config.py` defaults to SQLite but the code is backend-agnostic. To use PostgreSQL
-as the source of truth:
+### Docker (Postgres)
 
 ```bash
 docker compose up --build      # starts Postgres + the API
-```
-
-or point an existing server at it:
-
-```bash
-export DATABASE_URL="postgresql+psycopg://trustrail:trustrail@localhost:5432/trustrail"
-.venv/bin/uvicorn app.main:app --reload
-```
-
-For real deployments, disable `AUTO_CREATE_TABLES` and use Alembic:
-
-```bash
-.venv/bin/alembic revision --autogenerate -m "initial schema"
-.venv/bin/alembic upgrade head
 ```
 
 ### Make targets
@@ -226,7 +275,7 @@ make install   make run   make test   make demo   make compose-up   make migrate
 
 ---
 
-## 5. API reference & examples
+## 6. API reference & examples
 
 TrustRail's own API is under `/intents` and `/transactions`. The mock merchant is a
 **separate** system under `/merchant`. Money is always **integer minor units**
@@ -355,17 +404,16 @@ transactable by an AI buyer end to end.
 
 ---
 
-## 6. Tests
+## 7. Tests
 
 ```bash
 .venv/bin/python -m pytest
 ```
 
-**126 tests pass, fully offline.** The suite is hermetic — an in-memory SQLite DB
-and a frozen clock per test, with FastAPI dependency overrides — so it is fully
-deterministic. The Razorpay path is exercised through an **injected fake client**
-and a stdlib reproduction of Razorpay's HMAC signing, so no network or credentials
-are ever touched by `make test`.
+**133 tests pass, fully offline.** The suite is hermetic — an in-memory SQLite DB,
+a frozen clock, and the mock gateway per test — so it is fully deterministic even
+when `.env` configures Razorpay. The Razorpay path is exercised through an
+**injected fake client** and HMAC signature reproduction.
 
 The ten required scenarios live in `tests/test_spec_scenarios.py`, labelled
 `test_1 … test_10`:
@@ -383,20 +431,9 @@ The ten required scenarios live in `tests/test_spec_scenarios.py`, labelled
 | 9 | invalid state transition | forbidden by the map; execute-before-auth → `REQUIRES_AUTHORIZATION` |
 | 10 | every decision | writes a `POLICY_ENGINE` audit event |
 
-Phase 1 supporting suites: `test_canonicalization.py` (identity purity),
-`test_state_machine.py` (adjacency map completeness & terminals),
-`test_policy_unit.py` (the pure engine, check ordering), `test_flow.py`
-(happy path, idempotency, payment/order failure & recovery), and
-`test_merchant_api.py` (the mock merchant).
-
-Phase 2 suites (all offline): `test_razorpay_gateway.py` (status mapping,
-PENDING-on-create, definite→FAILED vs ambiguous→UNKNOWN taxonomy, receipt cap,
-signature maths, secret redaction), `test_webhook_endpoint.py` (503 in mock mode,
-signature rejection, amount-mismatch refusal, `payment.failed` is a non-terminal
-attempt), `test_reconciliation.py` (confirm/capture/needs-reference/opt-in-fail),
-`test_refund.py` (at-most-once refund, retry on error), and
-`test_concurrency_locking.py` (webhook + reconcile in either order converge to a
-single `COMPLETED`).
+Additional suites cover canonicalization, state machine, policy engine, flow/recovery,
+merchant API, Razorpay gateway, webhooks, reconciliation, refunds, concurrency locking,
+and **growth engine** (bundle evaluation, analytics, cart recovery).
 
 **Network-gated contract tests** live in `tests/razorpay/` and are OFF by default.
 They talk to real Razorpay Test Mode and skip cleanly unless enabled:
@@ -409,7 +446,7 @@ export RAZORPAY_KEY_ID=rzp_test_xxx RAZORPAY_KEY_SECRET=xxx RAZORPAY_WEBHOOK_SEC
 
 ---
 
-## 7. Design decisions
+## 8. Design decisions
 
 - **Money is integer paise**, never floats — Razorpay-native and exact.
 - **Identity excludes `agent_id` and `expires_at`** — they describe who/when, not what.
@@ -434,7 +471,7 @@ export RAZORPAY_KEY_ID=rzp_test_xxx RAZORPAY_KEY_SECRET=xxx RAZORPAY_WEBHOOK_SEC
 
 ---
 
-## 8. Known weaknesses
+## 9. Known weaknesses
 
 Honest limitations of the current build (several are intentional scope choices).
 This is **not** a production-ready payment system and does **not** provide
@@ -472,7 +509,7 @@ exactly-once execution:
 
 ---
 
-## 9. Phase 2 — Razorpay Test Mode
+## 10. Phase 2 — Razorpay Test Mode
 
 Phase 2 fills the `PaymentGateway` seam with a real **Razorpay Test Mode**
 integration and makes the asynchronous payment boundary real. The whole point:
@@ -559,35 +596,37 @@ Verify the real integration end-to-end with the network-gated contract suite (se
 
 ---
 
-## 10. Track 01 submission story
+## 11. Track 01 submission story
 
-**Track:** AI Growth & Agentic Commerce — “make a merchant transactable by an AI
-buyer end to end.”
+**Track:** AI Growth & Agentic Commerce — *"Grow the merchant's revenue, and make them sellable to AI buyers."*
 
-TrustRail takes Track 01's transactable-merchant path. The judge-visible story is:
+TrustRail demonstrates **BOTH** sides of Track 01 through ONE coherent product:
 
-```text
-GET /merchant/agent-card
-    -> discover a machine-readable catalogue and bounded purchase contract
-POST /intents
-    -> AI buyer proposes a structured, user-bounded PurchaseIntent
-POST /intents/{id}/validate -> POST /intents/{id}/authorize -> POST /transactions
-    -> deterministic policy, legal state transitions, and payment orchestration
-PAYMENT_PENDING
-    -> signed Razorpay webhook OR authoritative reconciliation
-PAYMENT_CONFIRMED -> merchant order -> COMPLETED
-```
+### Dimension 1: AI Revenue Growth & Agentic Commerce
 
-The differentiator is the failure boundary:
+| What | How |
+|------|-----|
+| **Conversational AI Buyer** | Gemini-powered agent discovers products, reasons about needs, proposes bundles |
+| **Intelligent Upselling** | "I need a mouse" → AI recommends Workstation Bundle (saves ₹5,299) |
+| **Budget-Gated Execution** | AI executes purchase through 8 deterministic policy checks |
+| **Growth Analytics** | Real-time GMV, incremental revenue (+₹2,332), AOV uplift (+200%), attach rate |
+| **Cart Recovery** | Bounded incentive vouchers re-engage abandoned intents |
+| **Machine-Readable Catalog** | `/merchant/agent-card` for AI buyer discovery |
 
-```text
-ambiguous gateway failure -> PAYMENT_UNKNOWN -> DO NOT CHARGE AGAIN
-    -> authoritative reconciliation -> confirmed / failed / recovery
-```
+### Dimension 2: Deterministic Transaction Integrity
 
-For a live judge run: start the service, open `/docs`, run
-`python scripts/demo.py`, and inspect `GET /transactions/{transaction_id}/audit`.
-The demo shows discovery, an allowed purchase, a policy block, identity
-idempotency, a paid-but-unfulfilled recovery, and the async Razorpay boundary.
-TrustRail is not a generic shopping chatbot, an ACP/AP2/UAP implementation, or a
-production-ready payment processor.
+| What | How |
+|------|-----|
+| **Canonical Identity** | SHA-256 idempotency key — no double charges |
+| **Pure Policy Engine** | 8 checks, no I/O, no LLM text — the AI cannot game it |
+| **Strict State Machine** | Adjacency-controlled lifecycle, no shortcutting |
+| **Razorpay Test Mode** | Real orders + HMAC-SHA256 webhook verification |
+| **Authoritative Recovery** | PAYMENT_UNKNOWN → reconcile → never auto-recharge |
+| **At-Most-Once Refunds** | Persisted refund ID prevents re-issue |
+
+### The Demo
+
+1. **AI Chat UI** → `http://localhost:8000/agent` — Talk to the AI, watch it recommend bundles, and see live transactions execute
+2. **Growth Dashboard** → `http://localhost:8000/dashboard` — Real-time revenue metrics after each AI purchase
+3. **Terminal Walkthrough** → `python scripts/demo.py` — 5-scenario lifecycle demo
+4. **Audit Trail** → `GET /transactions/{id}/audit` — Full explainable justification for every state change

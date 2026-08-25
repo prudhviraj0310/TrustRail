@@ -79,7 +79,9 @@ def test_create_payment_success_is_pending(razorpay_gateway, rz_client, svc_sess
     assert payload["partial_payment"] is False
 
 
-def test_create_payment_is_idempotent_reuses_order(razorpay_gateway, rz_client, svc_session):
+def test_create_payment_is_idempotent_reuses_order(
+    razorpay_gateway, rz_client, svc_session
+):
     first = razorpay_gateway.create_payment(
         svc_session, idempotency_key="txid_dup", amount=5000, currency="INR"
     )
@@ -93,7 +95,9 @@ def test_create_payment_is_idempotent_reuses_order(razorpay_gateway, rz_client, 
     assert len(rz_client.create_calls) == 1
 
 
-def test_create_payment_definite_error_is_failed(razorpay_gateway, rz_client, svc_session):
+def test_create_payment_definite_error_is_failed(
+    razorpay_gateway, rz_client, svc_session
+):
     # A well-formed rejection before any money can move -> safe FAILED (no order).
     from razorpay.errors import BadRequestError
 
@@ -105,7 +109,9 @@ def test_create_payment_definite_error_is_failed(razorpay_gateway, rz_client, sv
     assert result.order_ref is None
 
 
-def test_create_payment_ambiguous_error_is_unknown(razorpay_gateway, rz_client, svc_session):
+def test_create_payment_ambiguous_error_is_unknown(
+    razorpay_gateway, rz_client, svc_session
+):
     # Gateway/server/network/timeout -> UNKNOWN, never FAILED (we don't know).
     rz_client.raise_on_create = RuntimeError("connection reset")
     result = razorpay_gateway.create_payment(
@@ -115,7 +121,9 @@ def test_create_payment_ambiguous_error_is_unknown(razorpay_gateway, rz_client, 
     assert result.order_ref is None
 
 
-def test_create_payment_amount_is_integer_minor_units(razorpay_gateway, rz_client, svc_session):
+def test_create_payment_amount_is_integer_minor_units(
+    razorpay_gateway, rz_client, svc_session
+):
     razorpay_gateway.create_payment(
         svc_session, idempotency_key="txid_int", amount=129900, currency="INR"
     )
@@ -129,25 +137,35 @@ def test_create_payment_amount_is_integer_minor_units(razorpay_gateway, rz_clien
 def test_verify_webhook_signature_accepts_valid():
     body = b'{"event":"payment.captured"}'
     good = hmac.new(WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
-    assert verify_webhook_signature(secret=WEBHOOK_SECRET, body=body, signature=good) is True
+    assert (
+        verify_webhook_signature(secret=WEBHOOK_SECRET, body=body, signature=good) is True
+    )
 
 
 def test_verify_webhook_signature_rejects_tampered_body():
     body = b'{"event":"payment.captured"}'
     good = hmac.new(WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
     tampered = b'{"event":"payment.captured","extra":1}'
-    assert verify_webhook_signature(secret=WEBHOOK_SECRET, body=tampered, signature=good) is False
+    assert (
+        verify_webhook_signature(secret=WEBHOOK_SECRET, body=tampered, signature=good)
+        is False
+    )
 
 
 def test_verify_webhook_signature_rejects_wrong_secret():
     body = b"{}"
     good = hmac.new(WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
-    assert verify_webhook_signature(secret="other_secret", body=body, signature=good) is False
+    assert (
+        verify_webhook_signature(secret="other_secret", body=body, signature=good)
+        is False
+    )
 
 
 def test_verify_webhook_signature_rejects_empty():
     assert verify_webhook_signature(secret="", body=b"{}", signature="x") is False
-    assert verify_webhook_signature(secret=WEBHOOK_SECRET, body=b"{}", signature="") is False
+    assert (
+        verify_webhook_signature(secret=WEBHOOK_SECRET, body=b"{}", signature="") is False
+    )
 
 
 def test_instance_verify_uses_configured_secret(razorpay_gateway):

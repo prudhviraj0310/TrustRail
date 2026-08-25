@@ -23,6 +23,7 @@ from app.db import Base, get_db
 from app.main import app as fastapi_app
 from app.merchant.catalogue import MERCHANT_ID, seed_merchant
 from app.services.gateway import get_gateway
+from app.services.payment import default_gateway
 from app.services.razorpay_gateway import RazorpayGateway
 
 FROZEN_NOW = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
@@ -102,6 +103,8 @@ def client(SessionFactory, clock) -> TestClient:
 
     fastapi_app.dependency_overrides[get_db] = override_get_db
     fastapi_app.dependency_overrides[get_clock] = lambda: clock
+    # Always use mock gateway in tests, even when .env sets PAYMENT_GATEWAY=razorpay
+    fastapi_app.dependency_overrides[get_gateway] = lambda: default_gateway
 
     # NOTE: no `with TestClient(...)` — we skip the lifespan on purpose.
     test_client = TestClient(fastapi_app)
@@ -240,16 +243,28 @@ class FakeRazorpayClient:
     # -- test helpers to attach payments to an order -- #
     def add_captured(self, order_id, payment_id="pay_cap", amount=None, currency="INR"):
         amt = self.orders[order_id]["amount"] if amount is None else amount
-        p = {"id": payment_id, "status": "captured", "amount": amt,
-             "currency": currency, "order_id": order_id}
+        p = {
+            "id": payment_id,
+            "status": "captured",
+            "amount": amt,
+            "currency": currency,
+            "order_id": order_id,
+        }
         self.payments.setdefault(order_id, []).append(p)
         self.payment_by_id[payment_id] = p
         return p
 
-    def add_authorized(self, order_id, payment_id="pay_auth", amount=None, currency="INR"):
+    def add_authorized(
+        self, order_id, payment_id="pay_auth", amount=None, currency="INR"
+    ):
         amt = self.orders[order_id]["amount"] if amount is None else amount
-        p = {"id": payment_id, "status": "authorized", "amount": amt,
-             "currency": currency, "order_id": order_id}
+        p = {
+            "id": payment_id,
+            "status": "authorized",
+            "amount": amt,
+            "currency": currency,
+            "order_id": order_id,
+        }
         self.payments.setdefault(order_id, []).append(p)
         self.payment_by_id[payment_id] = p
         return p

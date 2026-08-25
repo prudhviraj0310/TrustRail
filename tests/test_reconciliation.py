@@ -46,8 +46,10 @@ def test_reconcile_confirms_a_captured_payment(
     rz_client.add_captured(order_id, payment_id="pay_recon", amount=CAPTURE_AMOUNT)
 
     out = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     assert out.action == "confirmed"
     assert _state(client_rz, created["transaction_id"]) == S.COMPLETED.value
@@ -61,12 +63,16 @@ def test_reconcile_is_idempotent(
     rz_client.add_captured(order_id)
 
     reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     again = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     assert again.action == "skipped"  # already COMPLETED, nothing to resolve
     assert _state(client_rz, created["transaction_id"]) == S.COMPLETED.value
@@ -83,8 +89,10 @@ def test_reconcile_captures_authorized_payment(
     rz_client.add_authorized(order_id, payment_id="pay_auth", amount=CAPTURE_AMOUNT)
 
     out = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     assert out.action == "captured_and_confirmed"
     assert len(rz_client.capture_calls) == 1  # TrustRail captured exactly once
@@ -101,8 +109,10 @@ def test_reconcile_open_order_stays_pending_by_default(
     created = _drive_to_pending(client_rz, make_payload, max_amount=500000)
     # no payment attached to the order at all
     out = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     assert out.action == "still_pending"
     assert _state(client_rz, created["transaction_id"]) == S.PAYMENT_PENDING.value
@@ -113,8 +123,11 @@ def test_reconcile_conclude_failed_is_opt_in(
 ):
     created = _drive_to_pending(client_rz, make_payload, max_amount=500000)
     out = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock, conclude_failed=True,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
+        conclude_failed=True,
     )
     assert out.action == "failed"
     assert _state(client_rz, created["transaction_id"]) == S.PAYMENT_FAILED.value
@@ -136,16 +149,20 @@ def test_reconcile_unknown_without_reference_parks_in_recovery(
 
     rz_client.raise_on_create = None  # gateway healthy again for the sweep
     out = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     assert out.action == "needs_reference"
     assert _state(client_rz, created["transaction_id"]) == S.RECOVERY_PENDING.value
 
     # a second sweep never re-charges or mints a new order
     reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=razorpay_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=razorpay_gateway,
+        clock=clock,
     )
     assert _state(client_rz, created["transaction_id"]) == S.RECOVERY_PENDING.value
     assert len(rz_client.orders) == 0  # no NEW order was minted during recovery
@@ -170,16 +187,25 @@ def test_reconcile_gateway_error_leaves_state_unchanged(
             raise RuntimeError("razorpay down")
 
     out = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"], gateway=Boom(), clock=clock
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=Boom(),
+        clock=clock,
     )
     assert out.action == "error"
-    assert _state(client_rz, created["transaction_id"]) == S.PAYMENT_PENDING.value  # unchanged
+    assert (
+        _state(client_rz, created["transaction_id"]) == S.PAYMENT_PENDING.value
+    )  # unchanged
 
 
-def test_reconcile_mock_gateway_is_not_capable(client_rz, make_payload, svc_session, clock):
+def test_reconcile_mock_gateway_is_not_capable(
+    client_rz, make_payload, svc_session, clock
+):
     created = _drive_to_pending(client_rz, make_payload, max_amount=500000)
     out = reconciliation.reconcile_transaction(
-        svc_session, transaction_identity=created["transaction_identity"],
-        gateway=default_gateway, clock=clock,
+        svc_session,
+        transaction_identity=created["transaction_identity"],
+        gateway=default_gateway,
+        clock=clock,
     )
     assert out.action == "not_capable"

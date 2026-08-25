@@ -52,12 +52,16 @@ class Settings(BaseSettings):
 
     @property
     def razorpay_configured(self) -> bool:
-        """True only when every Razorpay credential is present."""
-        return bool(
-            self.razorpay_key_id
-            and self.razorpay_key_secret
-            and self.razorpay_webhook_secret
-        )
+        """True when Razorpay key ID and secret are present (webhook secret is optional for test mode)."""
+        return bool(self.razorpay_key_id and self.razorpay_key_secret)
+
+    # ----------------------------------------------------------------- #
+    # AI Agent — Gemini API key for the conversational commerce agent.
+    # When empty, the agent falls back to an intelligent rule-based mode.
+    # Get a free key at https://aistudio.google.com/apikey
+    # ----------------------------------------------------------------- #
+    gemini_api_key: str = ""
+
 
 
 @lru_cache

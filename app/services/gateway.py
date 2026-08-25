@@ -32,7 +32,7 @@ def build_gateway(settings: Settings) -> PaymentGateway:
         if not settings.razorpay_configured:
             raise RuntimeError(
                 "PAYMENT_GATEWAY=razorpay but Razorpay credentials are incomplete; "
-                "set RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET and RAZORPAY_WEBHOOK_SECRET"
+                "set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET"
             )
         # Lazy import: keeps the razorpay SDK out of the default (mock) path.
         from app.services.razorpay_gateway import RazorpayGateway

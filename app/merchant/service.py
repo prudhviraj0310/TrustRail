@@ -99,6 +99,22 @@ def checkout_validate(db: Session, items: Sequence) -> CheckoutValidateOut:
     currency_conflict = len(currencies) > 1
     currency = next(iter(currencies)) if len(currencies) == 1 else None
 
+    # Check for bundle / cross-sell discount
+    from app.merchant.growth import MERCHANT_BUNDLES
+
+    item_map = dict(normalised)
+    for b in MERCHANT_BUNDLES:
+        bundle_map = {it["sku"]: it.get("quantity", 1) for it in b["skus"]}
+        if all(item_map.get(bsku, 0) >= bqty for bsku, bqty in bundle_map.items()):
+            # Bundle match: adjust total to bundle price
+            bundle_orig = sum(
+                db.get(MerchantProduct, bsku).price * bqty
+                for bsku, bqty in bundle_map.items()
+            )
+            discount = bundle_orig - b["bundle_price"]
+            total = max(0, total - discount)
+            break
+
     return CheckoutValidateOut(
         currency=currency,
         total=total,
@@ -120,9 +136,7 @@ def create_order(
     # Idempotency: a repeated create with the same key returns the same order.
     if idempotency_key:
         existing = db.scalar(
-            select(MerchantOrder).where(
-                MerchantOrder.idempotency_key == idempotency_key
-            )
+            select(MerchantOrder).where(MerchantOrder.idempotency_key == idempotency_key)
         )
         if existing is not None:
             return existing
@@ -145,6 +159,21 @@ def create_order(
         total += line_total
         currency = product.currency
         resolved.append((product, qty, line_total))
+
+    # Check for bundle / cross-sell discount
+    from app.merchant.growth import MERCHANT_BUNDLES
+
+    item_map = dict(normalised)
+    for b in MERCHANT_BUNDLES:
+        bundle_map = {it["sku"]: it.get("quantity", 1) for it in b["skus"]}
+        if all(item_map.get(bsku, 0) >= bqty for bsku, bqty in bundle_map.items()):
+            bundle_orig = sum(
+                db.get(MerchantProduct, bsku).price * bqty
+                for bsku, bqty in bundle_map.items()
+            )
+            discount = bundle_orig - b["bundle_price"]
+            total = max(0, total - discount)
+            break
 
     # All checks passed — commit the stock decrement and the order atomically.
     for product, qty, _ in resolved:
