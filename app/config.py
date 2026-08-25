@@ -62,6 +62,14 @@ class Settings(BaseSettings):
     # ----------------------------------------------------------------- #
     gemini_api_key: str = ""
 
+    # ----------------------------------------------------------------- #
+    # Background Reconciliation Worker
+    # Automatically sweeps PAYMENT_PENDING, PAYMENT_UNKNOWN, and
+    # RECOVERY_PENDING transactions on a periodic schedule.
+    # ----------------------------------------------------------------- #
+    reconciliation_worker_enabled: bool = True
+    reconciliation_worker_interval_seconds: int = 30
+
 
 
 @lru_cache

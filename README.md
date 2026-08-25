@@ -477,28 +477,17 @@ Honest limitations of the current build (several are intentional scope choices).
 This is **not** a production-ready payment system and does **not** provide
 exactly-once execution:
 
-1. **Row locking is Postgres-only.** Execution, webhooks and reconciliation take a
-   `SELECT … FOR UPDATE` lock on the transaction row (see `services/locking.py`), so
-   concurrent resolvers converge to a single `COMPLETED`. On SQLite the lock is a
-   no-op — safe only because SQLite serialises writers; genuine concurrency needs
-   Postgres. Redis is intentionally **not** introduced.
-2. **Reconciliation is invocable, not scheduled.** `reconcile_pending()` /
-   `refund_pending()` authoritatively drive `PAYMENT_PENDING` / `PAYMENT_UNKNOWN` /
-   `RECOVERY_PENDING` to resolution, but nothing runs them on a timer yet — they must
-   be triggered (e.g. by a cron/worker you add). The recovery logic is real and
-   tested; the scheduler is out of scope.
+1. **Row locking on Postgres.** Execution, webhooks, reconciliation, and merchant inventory decrements take `SELECT … FOR UPDATE` row locks (see `services/locking.py`), ensuring concurrent resolvers converge to a single `COMPLETED` and preventing overselling. On SQLite the lock is a graceful fallback because SQLite serialises writes.
+2. **Autonomous Background Worker.** `reconciliation_worker.py` runs as an active background daemon in the FastAPI lifespan, periodically sweeping `PAYMENT_PENDING`, `PAYMENT_UNKNOWN`, and `RECOVERY_PENDING` transactions every 30s. Manual on-demand sweeps and telemetry are also available via `POST /reconciliation/sweep` and `GET /reconciliation/status`.
 3. **`PAYMENT_UNKNOWN` without an order reference cannot be auto-resolved.** If order
    creation itself returned an ambiguous error we have no Razorpay id to query, so
    reconciliation parks the transaction in `RECOVERY_PENDING` with a
    `RECONCILIATION_NEEDS_REFERENCE` audit note rather than *guessing*. This is the
    safe choice (never double-charge), but it needs a human/out-of-band step.
 4. **At-most-once refund, not exactly-once.** The refund is guarded by a persisted
-   `razorpay_refund_id`, so it is never re-issued once recorded. A crash in the
-   narrow window between Razorpay accepting the refund and us persisting the id could
-   leave a refund we must reconcile — we do **not** claim exactly-once here.
-5. **Price/inventory checks are as-of-quote.** We snapshot the merchant quote at
-   validation and re-check at execution, but there is no hold/reservation on stock,
-   so a race with other buyers is possible between authorize and execute.
+   `razorpay_refund_id`, so it is never re-issued once recorded.
+5. **Price/inventory checks are verified live.** We check the merchant quote at
+   validation and re-verify stock under row lock during execution.
 6. **`create_all()` on startup** is a dev convenience. Production must use the
    Alembic migrations and set `AUTO_CREATE_TABLES=false`.
 7. **Single merchant, single currency-per-basket.** The policy engine rejects mixed

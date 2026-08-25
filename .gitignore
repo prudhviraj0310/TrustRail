@@ -23,5 +23,14 @@ trustrail.db
 .idea/
 .vscode/
 
-# Local agent tooling (machine-local overrides; not part of the submission)
+# Local agent tooling
 .claude/settings.local.json
+
+# Internal presentation scripts and application notes (Kept local, not pushed to GitHub)
+DEMO_GUIDE.md
+PRESENTATION_AND_DEMO_GUIDE.md
+TELUGU_DEMO_AND_VIDEO_GUIDE.md
+TELUGUISH_DEMO_AND_VIDEO_GUIDE.md
+RAZORPAY_EVALUATION_PILLARS.md
+SUBMISSION_APPLICATION_ANSWERS.md
+PROJECT_KNOWLEDGE_BASE_AND_AI_PROMPT.md

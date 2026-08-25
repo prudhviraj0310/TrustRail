@@ -15,6 +15,7 @@ from app import __version__
 from app.api.chat import router as chat_router
 from app.api.growth import router as growth_router
 from app.api.intents import router as intents_router
+from app.api.reconciliation import router as reconciliation_router
 from app.api.transactions import router as transactions_router
 from app.api.webhooks import router as webhooks_router
 from app.config import get_settings
@@ -32,6 +33,7 @@ from app.errors import (
 )
 from app.merchant.catalogue import seed_merchant
 from app.merchant.router import router as merchant_router
+from app.services.reconciliation_worker import start_worker, stop_worker
 from app.ui.dashboard import router as dashboard_router
 
 DESCRIPTION = """
@@ -55,7 +57,13 @@ async def lifespan(app: FastAPI):
             seed_merchant(db)
         finally:
             db.close()
-    yield
+    if settings.reconciliation_worker_enabled:
+        start_worker(SessionLocal, interval_seconds=settings.reconciliation_worker_interval_seconds)
+    try:
+        yield
+    finally:
+        if settings.reconciliation_worker_enabled:
+            await stop_worker()
 
 
 app = FastAPI(
@@ -109,6 +117,7 @@ app.include_router(merchant_router)
 app.include_router(webhooks_router)
 app.include_router(growth_router)
 app.include_router(chat_router)
+app.include_router(reconciliation_router)
 app.include_router(dashboard_router)
 
 

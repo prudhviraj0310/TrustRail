@@ -49,3 +49,13 @@ def lock_transaction_by_order_id(
     if _locking(db):
         stmt = stmt.with_for_update()
     return db.scalar(stmt)
+
+
+def lock_product(db: Session, sku: str):
+    """Fetch a product by SKU, locking the inventory row on Postgres to prevent overselling."""
+    from app.models.merchant import MerchantProduct
+
+    stmt = select(MerchantProduct).where(MerchantProduct.sku == sku)
+    if _locking(db):
+        stmt = stmt.with_for_update()
+    return db.scalar(stmt)

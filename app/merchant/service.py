@@ -146,8 +146,10 @@ def create_order(
     currency: str | None = None
     resolved: list[tuple[MerchantProduct, int, int]] = []
 
+    from app.services.locking import lock_product
+
     for sku, qty in normalised:
-        product = db.get(MerchantProduct, sku)
+        product = lock_product(db, sku)
         if product is None:
             raise ProductNotFound(sku)
         if product.inventory < qty:
