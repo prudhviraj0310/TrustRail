@@ -91,25 +91,41 @@
       color: var(--text-muted);
     }
 
-    .badge-track {
-      background: rgba(59, 130, 246, 0.12);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-      color: #60A5FA;
-      padding: 6px 14px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 600;
+    .header-right {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 12px;
     }
-    .badge-track::before {
-      content: "";
-      width: 8px;
-      height: 8px;
-      background: #10B981;
-      border-radius: 50%;
-      box-shadow: 0 0 8px #10B981;
+    .nav-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+    .nav-btn-primary {
+      background: linear-gradient(135deg, #3B82F6, #2563EB);
+      color: #FFFFFF;
+      border: 1px solid rgba(255,255,255,0.15);
+      box-shadow: 0 0 16px var(--primary-glow);
+    }
+    .nav-btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 0 24px var(--primary-glow);
+    }
+    .nav-btn-secondary {
+      background: rgba(255,255,255,0.06);
+      color: var(--text-muted);
+      border: 1px solid var(--card-border);
+    }
+    .nav-btn-secondary:hover {
+      color: var(--text-main);
+      background: rgba(255,255,255,0.1);
     }
 
     /* KPI Grid */
@@ -390,8 +406,13 @@
         <p>Razorpay AI Buildathon 2026 · Track 01 (AI Growth + Transactable Merchant)</p>
       </div>
     </div>
-    <div class="badge-track">
-      <span>Track 01: AI Growth & Integrity</span>
+    <div class="header-right">
+      <a href="/agent" class="nav-btn nav-btn-primary">💬 AI Buyer Chat</a>
+      <a href="/docs" class="nav-btn nav-btn-secondary" target="_blank">📄 API Docs</a>
+      <div class="nav-btn nav-btn-secondary" style="pointer-events: none;">
+        <span style="display:inline-block; width:8px; height:8px; background:#10B981; border-radius:50%; box-shadow:0 0 8px #10B981;"></span>
+        <span style="color:#60A5FA;">Track 01</span>
+      </div>
     </div>
   </header>
 
