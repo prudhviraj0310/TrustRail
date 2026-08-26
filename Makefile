@@ -10,7 +10,7 @@ test:          ## Run the full test suite
 	.venv/bin/python -m pytest
 
 demo:          ## Run the end-to-end demo against a running server
-	.venv/bin/python scripts/demo.py
+	.venv/bin/python scripts/cli_demo.py
 
 lint:          ## Ruff lint
 	.venv/bin/ruff check app tests

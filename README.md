@@ -250,7 +250,7 @@ TrustRail includes **136 automated tests** that execute in **~1.3 seconds** with
 .venv/bin/pytest -v
 
 # Run interactive 5-scenario guided terminal demo
-.venv/bin/python scripts/demo.py
+.venv/bin/python scripts/cli_demo.py
 
 # Check test coverage
 .venv/bin/pytest --cov=app tests/
@@ -306,7 +306,7 @@ TrustRail/
 │   │   └── locking.py           # Database Row-Level Locking (SELECT ... FOR UPDATE)
 │   └── ui/                      # Dark Tablet Fintech UI (Dashboard & Chat in ₹ INR)
 ├── scripts/
-│   └── demo.py                  # 5-Scenario Terminal Walkthrough Script
+│   └── cli_demo.py              # 5-Scenario Terminal Walkthrough Script
 ├── tests/                       # 136 Hermetic Automated Tests
 ├── .gitignore                   # Clean Git configuration (internal guides kept local)
 ├── requirements.txt             # Production Dependencies

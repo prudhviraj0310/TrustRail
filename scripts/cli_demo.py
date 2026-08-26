@@ -11,7 +11,7 @@ Walks through the complete product story against a running TrustRail server:
 
 Usage:
     uvicorn app.main:app --reload
-    python scripts/demo.py
+    python scripts/cli_demo.py
 """
 
 from __future__ import annotations
